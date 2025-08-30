@@ -1,0 +1,11 @@
+name,registration_number,status,authority
+John Smith,INV123456,Active,SEBI
+Jane Doe,INV654321,Active,SEBI
+Robert Johnson,INV789012,Revoked,SEBI
+Sarah Williams,INV345678,Active,SEBI
+Michael Brown,INV901234,Suspended,SEBI
+Alice Garcia,INV567890,Active,SEBI
+David Miller,INV123890,Active,SEBI
+Emily Davis,INV456789,Revoked,SEBI
+James Wilson,INV789123,Active,SEBI
+Olivia Martinez,INV234567,Active,SEBI

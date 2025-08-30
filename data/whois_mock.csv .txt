@@ -1,0 +1,5 @@
+domain,creation_date,expiration_date,registrar,country
+example.com,1995-08-14,2024-08-13,Example Registrar,US
+test-investments.com,2023-01-15,2024-01-15,Test Registrar,Unknown
+secure-wealth.com,2022-06-20,2023-06-20,Wealth Registrar,US
+stock-guru.com,2023-03-10,2024-03-10,Guru Registrar,IN

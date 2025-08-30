@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MarketGuard - Fraud Prevention Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #3498db;
+            --success: #2ecc71;
+            --danger: #e74c3c;
+            --warning: #f39c12;
+            --light: #ecf0f1;
+            --dark: #2c3e50;
+        }
+        
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .navbar {
+            background-color: var(--primary);
+        }
+        
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            border: none;
+            transition: transform 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .card-header {
+            background-color: var(--primary);
+            color: white;
+            border-radius: 10px 10px 0 0 !important;
+            font-weight: 600;
+        }
+        
+        .risk-low {
+            color: var(--success);
+            font-weight: bold;
+        }
+        
+        .risk-medium {
+            color: var(--warning);
+            font-weight: bold;
+        }
+        
+        .risk-high {
+            color: var(--danger);
+            font-weight: bold;
+        }
+        
+        .btn-primary {
+            background-color: var(--secondary);
+            border: none;
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--primary);
+        }
+        
+        .sidebar {
+            background-color: var(--light);
+            border-radius: 10px;
+            padding: 20px;
+            height: 100%;
+        }
+        
+        .stat-card {
+            text-align: center;
+            padding: 15px;
+            border-radius: 10px;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            color: var(--secondary);
+        }
+        
+        .nav-pills .nav-link.active {
+            background-color: var(--primary);
+        }
+        
+        .tab-content {
+            padding: 20px;
+            background: white;
+            border-radius: 0 0 10px 10px;
+        }
+        
+        .alert-section {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .fraud-type-card {
+            cursor: pointer;
+            height: 100%;
+        }
+        
+        .progress {
+            height: 25px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        
+        #detectionResults {
+            display: none;
+        }
+        
+        .analysis-badge {
+            font-size: 0.9rem;
+            padding: 5px 10px;
+            border-radius: 20px;
+        }
+        
+        .suspicious-item {
+            border-left: 4px solid var(--warning);
+            padding-left: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .fraudulent-item {
+            border-left: 4px solid var(--danger);
+            padding-left: 15px;
+            margin-bottom: 15px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-shield-alt me-2"></i>
+                MarketGuard Lite
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#"><i class="fas fa-home me-1"></i> Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#"><i class="fas fa-history me-1"></i> Detection History</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#"><i class="fas fa-database me-1"></i> Regulatory Database</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#"><i class="fas fa-cog me-1"></i> Settings</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <!-- Main Content -->
+            <div class="col-lg-8">
+                <!-- Fraud Detection Card -->
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-search me-2"></i>Fraud Detection Analysis</span>
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-sm btn-outline-light active" id="textAnalysisBtn">Text Analysis</button>
+                            <button type="button" class="btn btn-sm btn-outline-light" id="urlAnalysisBtn">URL Analysis</button>
+                            <button type="button" class="btn btn-sm btn-outline-light" id="advisorCheckBtn">Advisor Check</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- Loading indicator -->
+                        <div class="loading" id="loadingIndicator">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">Analyzing content... This may take a few seconds.</p>
+                        </div>
+                        
+                        <!-- Text Analysis Tab -->
+                        <div id="textAnalysisTab">
+                            <form id="fraudForm">
+                                <div class="mb-3">
+                                    <label for="contentToAnalyze" class="form-label">Paste content to analyze (social media post, announcement, etc.)</label>
+                                    <textarea class="form-control" id="contentToAnalyze" rows="4" placeholder="Paste suspicious content here..." required></textarea>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="sourcePlatform" class="form-label">Source Platform</label>
+                                            <select class="form-select" id="sourcePlatform">
+                                                <option value="">Select platform</option>
+                                                <option value="twitter">Twitter/X</option>
+                                                <option value="facebook">Facebook</option>
+                                                <option value="whatsapp">WhatsApp</option>
+                                                <option value="telegram">Telegram</option>
+                                                <option value="email">Email</option>
+                                                <option value="website">Website</option>
+                                                <option value="exchange">Stock Exchange</option>
+                                                <option value="other">Other</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="contentType" class="form-label">Content Type</label>
+                                            <select class="form-select" id="contentType">
+                                                <option value="">Select type</option>
+                                                <option value="investment_advice">Investment Advice/Tip</option>
+                                                <option value="announcement">Corporate Announcement</option>
+                                                <option value="advertisement">Investment Advertisement</option>
+                                                <option value="video">Video/Audio Content</option>
+                                                <option value="document">Document/Letter</option>
+                                                <option value="other">Other</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="fas fa-search me-2"></i>Analyze for Fraud Indicators
+                                </button>
+                            </form>
+                        </div>
+                        
+                        <!-- URL Analysis Tab (hidden by default) -->
+                        <div id="urlAnalysisTab" style="display: none;">
+                            <form id="urlForm">
+                                <div class="mb-3">
+                                    <label for="urlToAnalyze" class="form-label">Enter URL to analyze</label>
+                                    <input type="url" class="form-control" id="urlToAnalyze" placeholder="https://example.com" required>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="fas fa-globe me-2"></i>Analyze URL
+                                </button>
+                            </form>
+                        </div>
+                        
+                        <!-- Advisor Check Tab (hidden by default) -->
+                        <div id="advisorCheckTab" style="display: none;">
+                            <form id="advisorForm">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="advisorName" class="form-label">Advisor Name</label>
+                                            <input type="text" class="form-control" id="advisorName" placeholder="Enter advisor name">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="registrationNumber" class="form-label">Registration Number</label>
+                                            <input type="text" class="form-control" id="registrationNumber" placeholder="Enter registration number">
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="fas fa-user-check me-2"></i>Verify Advisor
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results Section -->
+                <div id="detectionResults" class="card mt-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-clipboard-list me-2"></i>Analysis Results</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h4>Risk Assessment: <span id="riskLevel" class="risk-medium">Medium Risk</span></h4>
+                                <p class="mb-3" id="riskDescription">This content shows some suspicious patterns that require further verification.</p>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Fraud Probability:</label>
+                                    <div class="progress">
+                                        <div id="riskProgress" class="progress-bar bg-warning" role="progressbar" style="width: 50%" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100">50%</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="alert alert-warning" id="warningAlert">
+                                    <strong><i class="fas fa-exclamation-triangle me-1"></i>Warning:</strong> This content matches 3 out of 10 known fraud patterns in our database.
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <canvas id="riskChart" width="300" height="200"></canvas>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <h5>Detected Fraud Indicators</h5>
+                            <ul class="list-group" id="fraudIndicators">
+                                <!-- Indicators will be populated dynamically -->
+                            </ul>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <h5>Recommendation</h5>
+                            <p id="recommendationText">We recommend verifying this content with regulatory authorities before taking any action.</p>
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                <button class="btn btn-success me-md-2" type="button" id="legitimateBtn">
+                                    <i class="fas fa-check me-1"></i>Legitimate
+                                </button>
+                                <button class="btn btn-danger" type="button" id="reportBtn">
+                                    <i class="fas fa-flag me-1"></i>Report to Regulators
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Recent Detections Card -->
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent Detections</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert-section" id="recentDetections">
+                            <!-- Content will be populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sidebar -->
+            <div class="col-lg-4">
+                <!-- Stats Overview -->
+                <div class="sidebar">
+                    <h5 class="mb-4"><i class="fas fa-chart-line me-2"></i>System Overview</h5>
+                    
+                    <div class="row text-center">
+                        <div class="col-6 mb-4">
+                            <div class="stat-card">
+                                <div class="stat-number text-primary" id="totalScans">0</div>
+                                <div class="stat-label">Content Scans</div>
+                            </div>
+                        </div>
+                        <div class="col-6 mb-4">
+                            <div class="stat-card">
+                                <div class="stat-number text-success" id="legitimatePercent">0%</div>
+                                <div class="stat-label">Legitimate</div>
+                            </div>
+                        </div>
+                        <div class="col-6 mb-4">
+                            <div class="stat-card">
+                                <div class="stat-number text-warning" id="suspiciousPercent">0%</div>
+                                <div class="stat-label">Suspicious</div>
+                            </div>
+                        </div>
+                        <div class="col-6 mb-4">
+                            <div class="stat-card">
+                                <div class="stat-number text-danger" id="fraudulentPercent">0%</div>
+                                <div class="stat-label">Fraudulent</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Fraud Types -->
+                    <div class="mt-4">
+                        <h6><i class="fas fa-shield-alt me-2"></i>Fraud Types Detected</h6>
+                        <div class="row" id="fraudTypes">
+                            <!-- Content will be populated dynamically -->
+                        </div>
+                    </div>
+                    
+                    <!-- Quick Actions -->
+                    <div class="mt-4">
+                        <h6><i class="fas fa-bolt me-2"></i>Quick Actions</h6>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-primary" id="generateReportBtn">
+                                <i class="fas fa-download me-1"></i>Generate Report
+                            </button>
+                            <button class="btn btn-outline-danger" id="reportSebiBtn">
+                                <i class="fas fa-flag me-1"></i>Report to SEBI
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-dark text-white text-center py-3 mt-5">
+        <p class="mb-0">MarketGuard Lite &copy; 2023 - SEBI Safe Space Initiative</p>
+        <small>Protecting investors from securities market fraud</small>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Base API URL - adjust according to your backend deployment
+        const API_BASE_URL = 'http://localhost:8000'; // Change this to your backend URL
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const fraudForm = document.getElementById('fraudForm');
+            const urlForm = document.getElementById('urlForm');
+            const advisorForm = document.getElementById('advisorForm');
+            const detectionResults = document.getElementById('detectionResults');
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            const riskLevel = document.getElementById('riskLevel');
+            const riskProgress = document.getElementById('riskProgress');
+            const riskDescription = document.getElementById('riskDescription');
+            const warningAlert = document.getElementById('warningAlert');
+            const recommendationText = document.getElementById('recommendationText');
+            const fraudIndicators = document.getElementById('fraudIndicators');
+            const textAnalysisTab = document.getElementById('textAnalysisTab');
+            const urlAnalysisTab = document.getElementById('urlAnalysisTab');
+            const advisorCheckTab = document.getElementById('advisorCheckTab');
+            const textAnalysisBtn = document.getElementById('textAnalysisBtn');
+            const urlAnalysisBtn = document.getElementById('urlAnalysisBtn');
+            const advisorCheckBtn = document.getElementById('advisorCheckBtn');
+            const legitimateBtn = document.getElementById('legitimateBtn');
+            const reportBtn = document.getElementById('reportBtn');
+            const generateReportBtn = document.getElementById('generateReportBtn');
+            const reportSebiBtn = document.getElementById('reportSebiBtn');
+            
+            // Initialize dashboard data
+            fetchDashboardData();
+            fetchRecentDetections();
+            fetchFraudTypes();
+            
+            // Tab switching functionality
+            textAnalysisBtn.addEventListener('click', function() {
+                textAnalysisTab.style.display = 'block';
+                urlAnalysisTab.style.display = 'none';
+                advisorCheckTab.style.display = 'none';
+                textAnalysisBtn.classList.add('active');
+                urlAnalysisBtn.classList.remove('active');
+                advisorCheckBtn.classList.remove('active');
+                resetForms();
+            });
+            
+            urlAnalysisBtn.addEventListener('click', function() {
+                textAnalysisTab.style.display = 'none';
+                urlAnalysisTab.style.display = 'block';
+                advisorCheckTab.style.display = 'none';
+                textAnalysisBtn.classList.remove('active');
+                urlAnalysisBtn.classList.add('active');
+                advisorCheckBtn.classList.remove('active');
+                resetForms();
+            });
+            
+            advisorCheckBtn.addEventListener('click', function() {
+                textAnalysisTab.style.display = 'none';
+                urlAnalysisTab.style.display = 'none';
+                advisorCheckTab.style.display = 'block';
+                textAnalysisBtn.classList.remove('active');
+                urlAnalysisBtn.classList.remove('active');
+                advisorCheckBtn.classList.add('active');
+                resetForms();
+            });
+            
+            // Initialize chart
+            const ctx = document.getElementById('riskChart').getContext('2d');
+            const riskChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Legitimate', 'Suspicious', 'Fraudulent'],
+                    datasets: [{
+                        data: [70, 20, 10],
+                        backgroundColor: [
+                            '#2ecc71',
+                            '#f39c12',
+                            '#e74c3c'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+            
+            // Form submission handlers
+            fraudForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                analyzeContent();
+            });
+            
+            urlForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                analyzeURL();
+            });
+            
+            advisorForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                verifyAdvisor();
+            });
+            
+            // Action button handlers
+            legitimateBtn.addEventListener('click', function() {
+                markAsLegitimate();
+            });
+            
+            reportBtn.addEventListener('click', function() {
+                reportToRegulators();
+            });
+            
+            generateReportBtn.addEventListener('click', function() {
+                generateReport();
+            });
+            
+            reportSebiBtn.addEventListener('click', function() {
+                reportToSebi();
+            });
+            
+            function resetForms() {
+                fraudForm.reset();
+                urlForm.reset();
+                advisorForm.reset();
+                detectionResults.style.display = 'none';
+            }
+            
+            function showLoading() {
+                loadingIndicator.style.display = 'block';
+                textAnalysisTab.style.display = 'none';
+                urlAnalysisTab.style.display = 'none';
+                advisorCheckTab.style.display = 'none';
+            }
+            
+            function hideLoading() {
+                loadingIndicator.style.display = 'none';
+                // Restore the active tab view
+                if (textAnalysisBtn.classList.contains('active')) {
+                    textAnalysisTab.style.display = 'block';
+                } else if (urlAnalysisBtn.classList.contains('active')) {
+                    urlAnalysisTab.style.display = 'block';
+                } else {
+                    advisorCheckTab.style.display = 'block';
+                }
+            }
+            
+            function analyzeContent() {
+                const content = document.getElementById('contentToAnalyze').value;
+                const sourcePlatform = document.getElementById('sourcePlatform').value;
+                const contentType = document.getElementById('contentType').value;
+                
+                if (!content) {
+                    alert('Please enter content to analyze');
+                    return;
+                }
+                
+                showLoading();
+                
+                fetch(`${API_BASE_URL}/api/analyze/text`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        text: content,
+                        source_platform: sourcePlatform,
+                        content_type: contentType
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    hideLoading();
+                    updateRiskUI(data.risk_score, data.indicators, data.recommendation);
+                    
+                    // Update chart with actual data from backend if available
+                    if (data.chart_data) {
+                        riskChart.data.datasets[0].data = data.chart_data;
+                    } else {
+                        // Fallback to calculated values based on risk score
+                        riskChart.data.datasets[0].data = [
+                            100 - data.risk_score,
+                            data.risk_score < 50 ? data.risk_score : 100 - data.risk_score,
+                            data.risk_score > 50 ? data.risk_score : 0
+                        ];
+                    }
+                    riskChart.update();
+                    
+                    // Show results section
+                    detectionResults.style.display = 'block';
+                    
+                    // Scroll to results
+                    detectionResults.scrollIntoView({ behavior: 'smooth' });
+                    
+                    // Refresh dashboard data
+                    fetchDashboardData();
+                })
+                .catch(error => {
+                    hideLoading();
+                    console.error('Error:', error);
+                    alert('An error occurred during analysis. Please try again.');
+                });
+            }
+            
+            function analyzeURL() {
+                const url = document.getElementById('urlToAnalyze').value;
+                
+                if (!url) {
+                    alert('Please enter a URL to analyze');
+                    return;
+                }
+                
+                showLoading();
+                
+                fetch(`${API_BASE_URL}/api/analyze/url`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        url: url
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    hideLoading();
+                    updateRiskUI(data.risk_score, data.indicators, data.recommendation);
+                    
+                    // Update chart
+                    riskChart.data.datasets[0].data = [
+                        100 - data.risk_score,
+                        data.risk_score < 50 ? data.risk_score : 100 - data.risk_score,
+                        data.risk_score > 50 ? data.risk_score : 0
+                    ];
+                    riskChart.update();
+                    
+                    detectionResults.style.display = 'block';
+                    detectionResults.scrollIntoView({ behavior: 'smooth' });
+                    
+                    // Refresh dashboard data
+                    fetchDashboardData();
+                })
+                .catch(error => {
+                    hideLoading();
+                    console.error('Error:', error);
+                    alert('An error occurred during URL analysis. Please try again.');
+                });
+            }
+            
+            function verifyAdvisor() {
+                const advisorName = document.getElementById('advisorName').value;
+                const registrationNumber = document.getElementById('registrationNumber').value;
+                
+                if (!advisorName && !registrationNumber) {
+                    alert('Please enter either advisor name or registration number');
+                    return;
+                }
+                
+                showLoading();
+                
+                // Determine which endpoint to call based on provided information
+                let endpoint, body;
+                
+                if (registrationNumber) {
+                    endpoint = `${API_BASE_URL}/api/check-advisor-by-registration`;
+                    body = { registration_number: registrationNumber };
+                } else {
+                    endpoint = `${API_BASE_URL}/api/check-advisor`;
+                    body = { name: advisorName };
+                }
+                
+                fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(body)
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    hideLoading();
+                    
+                    // For advisor check, we need to adapt the UI
+                    if (data.registered !== undefined) {
+                        const riskScore = data.registered ? 10 : 90;
+                        const indicators = data.registered ? 
+                            ["This advisor is registered with the appropriate authorities."] : 
+                            ["This advisor is not found in the regulatory database."];
+                        const recommendation = data.registered ? 
+                            "This advisor appears to be legitimate." : 
+                            "Warning: This advisor is not registered. Be cautious.";
+                        
+                        updateRiskUI(riskScore, indicators, recommendation);
+                        
+                        riskChart.data.datasets[0].data = data.registered ? [90, 5, 5] : [10, 10, 80];
+                        riskChart.update();
+                        
+                        detectionResults.style.display = 'block';
+                        detectionResults.scrollIntoView({ behavior: 'smooth' });
+                    } else {
+                        // Handle other response formats if needed
+                        updateRiskUI(data.risk_score, data.indicators, data.recommendation);
+                    }
+                    
+                    // Refresh dashboard data
+                    fetchDashboardData();
+                })
+                .catch(error => {
+                    hideLoading();
+                    console.error('Error:', error);
+                    alert('An error occurred during advisor verification. Please try again.');
+                });
+            }
+            
+            function updateRiskUI(riskScore, indicators, recommendation) {
+                if (riskScore < 30) {
+                    riskLevel.textContent = 'Low Risk';
+                    riskLevel.className = 'risk-low';
+                    riskProgress.className = 'progress-bar bg-success';
+                    riskProgress.style.width = riskScore + '%';
+                    riskProgress.textContent = riskScore + '%';
+                    riskDescription.textContent = 'This content appears to be legitimate with no significant fraud indicators detected.';
+                    warningAlert.innerHTML = '<strong><i class="fas fa-check-circle me-1"></i>Good news:</strong> This content matches known legitimate patterns.';
+                    warningAlert.className = 'alert alert-success';
+                } else if (riskScore < 70) {
+                    riskLevel.textContent = 'Medium Risk';
+                    riskLevel.className = 'risk-medium';
+                    riskProgress.className = 'progress-bar bg-warning';
+                    riskProgress.style.width = riskScore + '%';
+                    riskProgress.textContent = riskScore + '%';
+                    riskDescription.textContent = 'This content shows some suspicious patterns that require further verification.';
+                    warningAlert.innerHTML = '<strong><i class="fas fa-exclamation-triangle me-1"></i>Warning:</strong> This content matches ' + Math.floor(riskScore/10) + ' out of 10 known fraud patterns in our database.';
+                    warningAlert.className = 'alert alert-warning';
+                } else {
+                    riskLevel.textContent = 'High Risk';
+                    riskLevel.className = 'risk-high';
+                    riskProgress.className = 'progress-bar bg-danger';
+                    riskProgress.style.width = riskScore + '%';
+                    riskProgress.textContent = riskScore + '%';
+                    riskDescription.textContent = 'This content displays multiple characteristics commonly associated with fraudulent activity.';
+                    warningAlert.innerHTML = '<strong><i class="fas fa-radiation me-1"></i>High Alert:</strong> This content matches ' + Math.floor(riskScore/10) + ' out of 10 known fraud patterns in our database.';
+                    warningAlert.className = 'alert alert-danger';
+                }
+                
+                // Update indicators list
+                fraudIndicators.innerHTML = '';
+                if (indicators && indicators.length > 0) {
+                    indicators.forEach(indicator => {
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item';
+                        
+                        // Determine icon and color based on risk level
+                        if (riskScore < 30) {
+                            li.innerHTML = `<i class="fas fa-check-circle text-success me-2"></i>${indicator}`;
+                        } else if (riskScore < 70) {
+                            li.innerHTML = `<i class="fas fa-exclamation-circle text-warning me-2"></i>${indicator}`;
+                        } else {
+                            li.innerHTML = `<i class="fas fa-exclamation-circle text-danger me-2"></i>${indicator}`;
+                        }
+                        
+                        fraudIndicators.appendChild(li);
+                    });
+                } else {
+                    const li = document.createElement('li');
+                    li.className = 'list-group-item';
+                    li.textContent = 'No specific indicators detected.';
+                    fraudIndicators.appendChild(li);
+                }
+                
+                // Update recommendation
+                if (recommendation) {
+                    recommendationText.textContent = recommendation;
+                }
+            }
+            
+            function fetchDashboardData() {
+                fetch(`${API_BASE_URL}/api/dashboard`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Update dashboard stats
+                    document.getElementById('totalScans').textContent = data.total_scans || 0;
+                    document.getElementById('legitimatePercent').textContent = (data.legitimate_percent || 0) + '%';
+                    document.getElementById('suspiciousPercent').textContent = (data.suspicious_percent || 0) + '%';
+                    document.getElementById('fraudulentPercent').textContent = (data.fraudulent_percent || 0) + '%';
+                })
+                .catch(error => {
+                    console.error('Error fetching dashboard data:', error);
+                });
+            }
+            
+            function fetchRecentDetections() {
+                fetch(`${API_BASE_URL}/api/recent-detections`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const container = document.getElementById('recentDetections');
+                    container.innerHTML = '';
+                    
+                    if (data && data.length > 0) {
+                        data.forEach(item => {
+                            const div = document.createElement('div');
+                            div.className = item.risk_level === 'high' ? 'fraudulent-item' : 'suspicious-item';
+                            
+                            const badgeClass = item.risk_level === 'high' ? 'bg-danger' : 'bg-warning';
+                            const badgeText = item.risk_level === 'high' ? 'Fraudulent' : 'Suspicious';
+                            
+                            div.innerHTML = `
+                                <div class="d-flex justify-content-between">
+                                    <h6>${item.title}</h6>
+                                    <span class="badge ${badgeClass} analysis-badge">${badgeText}</span>
+                                </div>
+                                <p class="mb-1">${item.description}</p>
+                                <small class="text-muted">Detected ${item.time_ago}</small>
+                            `;
+                            
+                            container.appendChild(div);
+                        });
+                    } else {
+                        container.innerHTML = '<p>No recent detections found.</p>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching recent detections:', error);
+                    document.getElementById('recentDetections').innerHTML = '<p>Error loading recent detections.</p>';
+                });
+            }
+            
+            function fetchFraudTypes() {
+                fetch(`${API_BASE_URL}/api/fraud-types`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const container = document.getElementById('fraudTypes');
+                    container.innerHTML = '';
+                    
+                    if (data && data.length > 0) {
+                        data.forEach(type => {
+                            const col = document.createElement('div');
+                            col.className = 'col-6 mb-3';
+                            
+                            col.innerHTML = `
+                                <div class="card fraud-type-card">
+                                    <div class="card-body text-center">
+                                        <div class="feature-icon">
+                                            <i class="${type.icon}"></i>
+                                        </div>
+                                        <h6>${type.name}</h6>
+                                        <small class="text-muted">${type.count} detected</small>
+                                    </div>
+                                </div>
+                            `;
+                            
+                            container.appendChild(col);
+                        });
+                    } else {
+                        container.innerHTML = '<p>No fraud type data available.</p>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching fraud types:', error);
+                    document.getElementById('fraudTypes').innerHTML = '<p>Error loading fraud types.</p>';
+                });
+            }
+            
+            function markAsLegitimate() {
+                // Implementation for marking as legitimate
+                alert('This content has been marked as legitimate. Thank you for your feedback!');
+            }
+            
+            function reportToRegulators() {
+                // Implementation for reporting to regulators
+                alert('This content has been reported to the regulators. Thank you for your vigilance!');
+            }
+            
+            function generateReport() {
+                // Implementation for generating report
+                alert('Report generation feature will be implemented soon.');
+            }
+            
+            function reportToSebi() {
+                // Implementation for reporting to SEBI
+                alert('Redirecting to SEBI reporting portal...');
+            }
+        });
+    </script>
+</body>
+</html>

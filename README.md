@@ -47,10 +47,6 @@ pip (Python package manager)
 A modern web browser (Chrome, Firefox, Safari, Edge)
 
 Backend Setup
-# Clone repository
-git clone https://github.com/your-username/marketguard-lite.git
-cd marketguard-lite
-
 # Create virtual environment
 python -m venv venv
 source venv/bin/activate   # On Windows: venv\Scripts\activate

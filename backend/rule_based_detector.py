@@ -73,11 +73,22 @@ class RuleBasedDetector:
             }
         }
         
-        # Known fraudulent domains and patterns (simplified example)
+        # Known fraudulent domains and patterns
         self.known_fraudulent_domains = [
-            "fakeinvestment.com", 
+            "bitcoin-doubler.com", 
             "getrichquick.org",
-            "bitcoin-doubler.net"
+            "crypto-double.net",
+            "secret-investment-tips.com",
+            "stock-insider.com",
+            "free-money-now.net",
+            "guaranteed-returns-fast.com"
+        ]
+        
+        # Suspicious URL patterns
+        self.suspicious_url_patterns = [
+            r"bitcoin.*double", r"free.*money", r"investment.*secret", 
+            r"stock.*tip", r"guaranteed.*return", r"millionaire.*secret",
+            r"double.*money", r"risk.*free", r"secret.*strategy"
         ]
         
         # Platform-specific risk modifiers
@@ -186,11 +197,11 @@ class RuleBasedDetector:
         content_modifier = self.content_type_modifiers.get(content_type, 0.0)
         
         # Adjust risk score with modifiers (platform and content type can add up to 0.4)
-        risk_score = risk_score * (1 + platform_modifier + content_modifier)
+        adjusted_score = risk_score * (1 + platform_modifier + content_modifier)
         
         # Normalize risk score to 0-100 range
         if max_possible_score > 0:
-            normalized_score = max(0, min(100, (risk_score / max_possible_score) * 100))
+            normalized_score = max(0, min(100, (adjusted_score / max_possible_score) * 100))
         else:
             normalized_score = 0
         
@@ -223,24 +234,33 @@ class RuleBasedDetector:
         Analyze a URL for potential fraud indicators
         """
         try:
+            # Ensure URL has a scheme
+            if not url.startswith(('http://', 'https://')):
+                url = 'http://' + url
+                
             parsed_url = urlparse(url)
             domain = parsed_url.netloc.lower()
             
             # Check if domain is in known fraudulent list
             domain_risk = 0
-            if any(fraud_domain in domain for fraud_domain in self.known_fraudulent_domains):
-                domain_risk = 80
+            for fraud_domain in self.known_fraudulent_domains:
+                if fraud_domain in domain:
+                    domain_risk = 80
+                    break
             
             # Check for suspicious URL patterns
-            suspicious_patterns = [
-                r"bitcoin.*double", r"free.*money", r"investment.*secret", 
-                r"stock.*tip", r"guaranteed.*return", r"millionaire.*secret"
-            ]
-            
             url_risk = 0
-            for pattern in suspicious_patterns:
+            for pattern in self.suspicious_url_patterns:
                 if re.search(pattern, url.lower()):
                     url_risk += 15
+            
+            # Check for IP addresses instead of domains
+            if re.match(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", domain):
+                url_risk += 20
+            
+            # Check for newly registered domains (simplified check for demo)
+            if any(x in domain for x in ['new', 'latest', '2024', '2025']):
+                url_risk += 10
             
             # Combine risks (cap at 100)
             total_risk = min(100, domain_risk + url_risk)
@@ -264,7 +284,7 @@ class RuleBasedDetector:
             }
             
         except Exception as e:
-            return {"error": f"URL analysis failed: {str(e)}"}
+            return {"error": f"URL analysis failed: {str(e)}", "risk_score": 50, "risk_level": "medium"}
     
     def check_advisor(self, name: str = None, registration_number: str = None) -> Dict:
         """
@@ -274,15 +294,20 @@ class RuleBasedDetector:
         # Mock database of legitimate advisors (in reality, this would be an external API call)
         legitimate_advisors = {
             "registration_numbers": {
-                "IN123456": {"name": "John Smith", "status": "active", "type": "Equity Advisor"},
-                "IN654321": {"name": "Jane Doe", "status": "active", "type": "Research Analyst"},
-                "US789012": {"name": "Robert Brown", "status": "active", "type": "Investment Advisor"},
+                "IN123456": {"name": "John Smith", "status": "active", "type": "Equity Advisor", "valid_until": "2025-12-31"},
+                "IN654321": {"name": "Jane Doe", "status": "active", "type": "Research Analyst", "valid_until": "2024-11-15"},
+                "US789012": {"name": "Robert Brown", "status": "active", "type": "Investment Advisor", "valid_until": "2026-03-20"},
+                "IN987654": {"name": "Sarah Johnson", "status": "suspended", "type": "Wealth Manager", "valid_until": "2024-08-10"},
+                "IN246810": {"name": "Michael Chen", "status": "active", "type": "Portfolio Manager", "valid_until": "2025-06-30"},
             },
             "names": {
                 "john smith": "IN123456",
                 "jane doe": "IN654321",
                 "robert brown": "US789012",
-                "sarah johnson": "IN987654"  # This one is not in registration database
+                "sarah johnson": "IN987654",
+                "michael chen": "IN246810",
+                "david wilson": None,  # Not registered
+                "emma thompson": None  # Not registered
             }
         }
         
@@ -290,16 +315,27 @@ class RuleBasedDetector:
             # Check by registration number
             advisor = legitimate_advisors["registration_numbers"].get(registration_number.upper())
             if advisor:
+                risk_score = 10 if advisor["status"] == "active" else 70
+                risk_level = "low" if advisor["status"] == "active" else "high"
+                
+                recommendation = f"This advisor is registered and {advisor['status']}. "
+                if advisor["status"] == "active":
+                    recommendation += f"Registration valid until {advisor['valid_until']}."
+                else:
+                    recommendation += "Do not engage with suspended advisors."
+                
                 return {
-                    "registered": True,
+                    "registered": advisor["status"] == "active",
+                    "status": advisor["status"],
                     "details": advisor,
-                    "risk_score": 10,
-                    "risk_level": "low",
-                    "recommendation": "This advisor appears to be properly registered."
+                    "risk_score": risk_score,
+                    "risk_level": risk_level,
+                    "recommendation": recommendation
                 }
             else:
                 return {
                     "registered": False,
+                    "status": "not_found",
                     "risk_score": 90,
                     "risk_level": "high",
                     "recommendation": "This registration number was not found in our database. Verify with official regulatory authorities."
@@ -313,17 +349,28 @@ class RuleBasedDetector:
             if registration_id:
                 advisor = legitimate_advisors["registration_numbers"].get(registration_id)
                 if advisor:
+                    risk_score = 15 if advisor["status"] == "active" else 75
+                    risk_level = "low" if advisor["status"] == "active" else "high"
+                    
+                    recommendation = f"This advisor is registered and {advisor['status']}. "
+                    if advisor["status"] == "active":
+                        recommendation += f"Registration valid until {advisor['valid_until']}."
+                    else:
+                        recommendation += "Do not engage with suspended advisors."
+                    
                     return {
-                        "registered": True,
+                        "registered": advisor["status"] == "active",
+                        "status": advisor["status"],
                         "details": advisor,
-                        "risk_score": 15,
-                        "risk_level": "low",
-                        "recommendation": "This advisor appears to be properly registered."
+                        "risk_score": risk_score,
+                        "risk_level": risk_level,
+                        "recommendation": recommendation
                     }
             
             # Name not found or not registered
             return {
                 "registered": False,
+                "status": "not_found",
                 "risk_score": 80,
                 "risk_level": "high",
                 "recommendation": "This advisor name was not found in our database. Verify with official regulatory authorities."
@@ -338,9 +385,17 @@ if __name__ == "__main__":
     
     # Test with a suspicious message
     test_message = """
-    LIMITED TIME OFFER! Act NOW to double your Bitcoin in 24 hours! 
-    This is a RISK-FREE opportunity with GUARANTEED RETURNS. 
-    Don't miss out on this exclusive offer - wire transfer your funds TODAY!
+    LIMITED TIME OFFER! 🚀 Act NOW before it's too late! 
+    We're offering a LIMITED TIME chance to DOUBLE YOUR MONEY in just 24 hours! 
+    Our secret Bitcoin trading algorithm guarantees 200% returns with ABSOLUTELY NO RISK! 
+    This is a ONCE IN A LIFETIME opportunity that wealthy investors don't want you to know about!
+
+    Don't miss out! Wire transfer $500 to our secure offshore account TODAY and watch your investment grow! 
+    We're not registered with SEC because we operate through private channels for maximum profits. 
+    Elon Musk and Warren Buffett have already invested millions in our system!
+
+    Click here now: http://bitcoin-doubler-secret.com/offer
+    Limited spots available! 💰🔥
     """
     
     result = detector.analyze_text(test_message, "whatsapp", "investment_advice")
@@ -362,4 +417,5 @@ if __name__ == "__main__":
     print("\n" + "="*50)
     advisor_result = detector.check_advisor(registration_number="IN123456")
     print(f"Advisor Registered: {advisor_result['registered']}")
+    print(f"Advisor Status: {advisor_result['status']}")
     print(f"Advisor Risk Score: {advisor_result['risk_score']}%")
